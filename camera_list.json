@@ -1,0 +1,13 @@
+{
+    "device_id": "0304e846-8fa3-5f6d-9606-ef12e35420fa",
+    "camera_dict": {
+        "cam1": {
+            "url": "rtsp://admin:admin@192.168.29.88:1935",
+            "status": "Active"
+        },
+        "cam2": {
+            "url": "rtsp://admin:admin@192.168.29.88:1935",
+            "status": "Inactive"
+        }
+    }
+}
