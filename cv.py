@@ -11,8 +11,26 @@ import asyncio
 import aiohttp  # For async HTTP requests
 from datetime import datetime
 from stream import start_stream_capture
+import logging
+from logging.handlers import RotatingFileHandler
 
 load_dotenv()
+
+log_handler = RotatingFileHandler('logs/AeyeIoT.log', maxBytes=1000000, backupCount=5)
+logging.basicConfig(
+    handlers=[log_handler],
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
+def log_event(level, message):
+    log_entry = {
+        'level': level,
+        'message': message,
+        'timestamp': datetime.now().isoformat()
+    }
+    logging.log(level, json.dumps(log_entry))
+
 
 env_url = os.getenv('env_url', "https://6to69015t0.execute-api.us-east-1.amazonaws.com/test/")
 json_path = os.getenv('json_path', "/home/rp/AeyeIoT/camera.json")
@@ -34,10 +52,10 @@ def send_image(device_id, cam_name, image_bytes):
 
             headers = {'Content-Type': 'application/octet-stream'}
             requests.post(upload_image_api_url, headers=headers, data=image_bytes)
-            print(f"Image uploaded successfully for {cam_name}")
+            log_event(logging.INFO, f"Image of {device_id}, uploaded successfully for {cam_name}")
             break
         except Exception as e:
-            print(f"Error uploading file: {e}")
+            log_event(logging.ERROR, f"Error uploading file: {str(e)}")
             continue
 
 # Function to process video streams
@@ -45,7 +63,6 @@ def process_stream(stream_data, cam_key, cam_details):
     device_id = stream_data['device_id']
     stream = cam_details["url"]
     cap = None
-    max_retries = 10
     retry_count = 0
     stream_image_data = []
 
@@ -55,12 +72,12 @@ def process_stream(stream_data, cam_key, cam_details):
         if cap.isOpened():
             break
         else:
-            print(f"Error opening stream: {stream}. Retrying... ({retry_count + 1}/{max_retries})")
+            log_event(logging.WARNING, f"Error opening stream for {cam_key}: with {stream}. Retrying...")
             retry_count += 1
             stream_data["camera_dict"]["camera_details"][cam_key]["status"] = "Inactive"
-            with open(json_path, 'w') as json_file:
-                json.dump(stream_data, json_file, indent=4)
-            time.sleep(1)
+            # with open(json_path, 'w') as json_file:
+            #     json.dump(stream_data, json_file, indent=4)
+            time.sleep(5)
     
     fps = int(cap.get(cv2.CAP_PROP_FPS))
 
@@ -72,29 +89,28 @@ def process_stream(stream_data, cam_key, cam_details):
     thread.start()
 
     # Update stream status
-    stream_data["camera_dict"]["camera_details"][cam_key]["status"] = "Active"
-    stream_data["camera_dict"]["camera_details"][cam_key]["cam_id"] = cam_id
-    stream_data["camera_dict"]["camera_details"][cam_key]["public_url"] = f"https://{BUCKET_NAME}.s3.amazonaws.com/{device_id}/{cam_id}/YEAR/MONTH/DATE/HOUR/HOUR.m3u8"
+    # stream_data["camera_dict"]["camera_details"][cam_key]["status"] = "Active"
+    # stream_data["camera_dict"]["camera_details"][cam_key]["cam_id"] = cam_id
+    # stream_data["camera_dict"]["camera_details"][cam_key]["public_url"] = f"https://{BUCKET_NAME}.s3.amazonaws.com/{device_id}/{cam_id}/"
     
-    with open(json_path, 'w') as json_file:     
-        json.dump(stream_data, json_file, indent=4)
+    # with open(json_path, 'w') as json_file:     
+    #     json.dump(stream_data, json_file, indent=4)
 
     prev_gray = None
 
     while True:
         ret, frame = cap.read()
         if not ret:
-            print(f"Error reading frame from stream: {stream}. Retrying...")
+            log_event(logging.WARNING, f"Error reading frame for {cam_key}: with {stream}. Retrying...")
             cap.release()
             retry_count = 0
             while True:
                 cap = cv2.VideoCapture(stream)
                 if cap.isOpened():
-                    print(f"Reconnected to stream: {stream}")
+                    log_event(logging.INFO, f"Reconnected to stream: {stream}")
                     break
                 else:
                     retry_count += 1
-                    print(f"Retrying to open stream... ({retry_count}/{max_retries})")
                     time.sleep(1)
             continue
 
@@ -111,10 +127,9 @@ def process_stream(stream_data, cam_key, cam_details):
         # If significant change is detected, store the frame for analysis
         if change_count > stream_data.get('frame_change_count', 8000):
             stream_image_data.append((frame, change_count))
-            print(f"Significant change detected from {cam_key}!")
-
             # If we have 5 frames, choose the most stable one and send it
             if len(stream_image_data) >= 5:
+                log_event(logging.INFO, f"Significant change detected from {cam_key}!")
                 most_stable_frame = min(stream_image_data, key=lambda x: x[1])[0]
 
                 # Encode the most stable frame to JPEG
@@ -153,8 +168,6 @@ async def main():
         stream_data["frame_change_count"] = response_data["camera_dict"].get('frame_change_count',7000)	
         json.dump(stream_data, f)
 
-    print(stream_data)
-    
     # Determine the number of workers based on the number of cameras
     max_worker_count = len(stream_data["camera_dict"]["camera_details"].keys())
 
@@ -175,8 +188,7 @@ async def main():
             try:
                 future.result()
             except Exception as e:
-                print(f"Error occurred in stream processing: {e}")
-
+                log_event(logging.ERROR, f"Error occurred in stream processing: {str(e)}")
 
 if __name__ == "__main__":
     asyncio.run(main())

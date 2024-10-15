@@ -4,7 +4,7 @@ import time
 def disconnect_and_forget():
     try:
         # Run the disconnect script in the background
-        subprocess.Popen(['sudo', 'bash', '/home/rp/AeyeIoT/wifi-connect-headless-rpi/scripts/run.sh', '-d'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        subprocess.Popen(['sudo', 'bash', '/home/rp/Aeye_iot/wifi-connect-headless-rpi/scripts/run.sh', '-d'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         
         # Wait for 2 seconds before rebooting
         time.sleep(4)

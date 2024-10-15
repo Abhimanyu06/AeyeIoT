@@ -2,12 +2,32 @@ import os
 from dotenv import load_dotenv
 import subprocess
 import boto3
+import json
 from datetime import datetime, timedelta
 import time
 import threading
 import concurrent.futures
+import logging
+from logging.handlers import RotatingFileHandler
 
 load_dotenv()
+
+# Modify the log format to exclude leading zeros in year, month, day, hour, minutes, and seconds
+log_handler = RotatingFileHandler('logs/AeyeIoT.log', maxBytes=1000000, backupCount=5)
+logging.basicConfig(
+    handlers=[log_handler],
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y/%m/%d %H:%M:%S'  # Custom date format without leading zeros
+)
+
+def log_event(level, message):
+    log_entry = {
+        'level': level,
+        'message': message,
+        'timestamp': datetime.now().strftime('%Y/%m/%d %H:%M:%S')
+    }
+    logging.log(level, json.dumps(log_entry))
 
 s3 = boto3.client('s3')
 BUCKET_NAME = os.getenv('BUCKET_NAME', 'aeye-stream')
@@ -30,27 +50,25 @@ def get_latest_file_in_s3_folder(bucket_name, s3_folder):
         files = []
         return files
 
-
 def upload_to_s3(file_path, s3_folder, all_files_s3):
     """Upload file to the specified S3 folder."""
     s3_key = os.path.join(s3_folder, os.path.basename(file_path))
     try:
         if file_path.endswith(".m3u8"):
             s3.upload_file(file_path, BUCKET_NAME, s3_key)
-            print(f'Successfully uploaded {file_path} to s3://{BUCKET_NAME}/{s3_key}')
 
         elif file_path.endswith(".ts"):
             if s3_key not in all_files_s3:
                 s3.upload_file(file_path, BUCKET_NAME, s3_key)
-                print(f'Successfully uploaded {file_path} to s3://{BUCKET_NAME}/{s3_key}')
-        
+                os.remove(file_path)
+
     except Exception as e:
-        print(f'Error uploading {file_path}: {e}')
+        log_event(logging.ERROR, f"Error uploading {file_path}: {str(e)}")
 
 def create_hourly_folder():
     """Create a folder for the current hour in GMT +5:30."""
     now = datetime.utcnow() + timedelta(hours=5, minutes=30)
-    hourly_folder = now.strftime('%Y/%m/%d/%H')
+    hourly_folder = now.strftime('%-Y/%-m/%-d/%-H')
     return hourly_folder
 
 def upload_files_in_background(cam_path, local_hourly_folder, hourly_folder):
@@ -64,7 +82,7 @@ def upload_files_in_background(cam_path, local_hourly_folder, hourly_folder):
         # List all files currently in the folder
         current_files = set(os.listdir(local_hourly_folder))
         new_files = current_files - uploaded_files
-        if len(new_files)>1:
+        if len(new_files) > 1:
             new_files.remove(max(new_files))
             # Upload new files using a ThreadPoolExecutor
             with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -86,11 +104,11 @@ def start_stream_capture(cam_path, RTSP_URL):
     while True:
         # Create a new hourly folder
         hourly_folder = create_hourly_folder()
-        local_hourly_folder = os.path.join(LOCAL_OUTPUT_PATH, cam_path+"/"+hourly_folder)
+        local_hourly_folder = os.path.join(LOCAL_OUTPUT_PATH, cam_path + "/" + hourly_folder)
         os.makedirs(local_hourly_folder, exist_ok=True)
 
-        current_time = datetime.now().strftime('%H%M%S')
-        m3u8_file = datetime.now().strftime('%H')
+        current_time = datetime.now().strftime('%-H%M%S')  # Custom format without leading zeros
+        m3u8_file = datetime.now().strftime('%-H')
         # File template for segmenting with minute and second in filename
         segment_file = os.path.join(local_hourly_folder, f'{current_time}_%03d.ts')
         m3u8_file = os.path.join(local_hourly_folder, f'{m3u8_file}.m3u8')
@@ -116,9 +134,9 @@ def start_stream_capture(cam_path, RTSP_URL):
             m3u8_file  # Output .m3u8 file
         ]
 
-        print(f"Starting stream capture for folder {hourly_folder}")
+        log_event(logging.INFO, f"Starting stream capture for folder {hourly_folder}")
+
         subprocess.Popen(command)  # Start the FFmpeg process
 
         # Wait for the next hour to start capturing
         time.sleep(3600)  # Wait until the next hour starts
-
