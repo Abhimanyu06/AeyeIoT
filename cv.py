@@ -1,5 +1,7 @@
 import cv2
+import uuid
 import os
+from dotenv import load_dotenv
 import concurrent.futures
 import threading
 import requests
@@ -8,10 +10,13 @@ import time
 import asyncio
 import aiohttp  # For async HTTP requests
 from datetime import datetime
+from stream import start_stream_capture
 
-env_url = "https://6to69015t0.execute-api.us-east-1.amazonaws.com/test/"
-json_path = "/home/rp/Aeye_iot/camera.json"
-record_time = 180
+load_dotenv()
+
+env_url = os.getenv('env_url', "https://6to69015t0.execute-api.us-east-1.amazonaws.com/test/")
+json_path = os.getenv('json_path', "/home/rp/Aeye_iot/camera.json")
+BUCKET_NAME = os.getenv('BUCKET_NAME', 'aeye-stream')
 
 # Define the codec and create VideoWriter object
 fourcc = cv2.VideoWriter_fourcc(*'XVID')
@@ -19,17 +24,6 @@ fourcc = cv2.VideoWriter_fourcc(*'XVID')
 def run_async(func, *args):
     """ Helper function to run async functions in a thread """
     asyncio.run(func(*args))
-
-
-async def update_camera_status(device_id, cam_name, cam_status):
-    test_url = f"{env_url}/device-camera-list/{device_id}?cam_name={cam_name}&status={cam_status}"
-    async with aiohttp.ClientSession() as session:
-        async with session.put(test_url) as response:
-            if response.status == 200:
-                print("Camera status updated successfully.")
-            else:
-                print(f"Failed to update camera status. Status code: {response.status}")
-
 
 
 # Function to send POST request in a separate thread
@@ -46,87 +40,6 @@ def send_image(device_id, cam_name, image_bytes):
             print(f"Error uploading file: {e}")
             continue
 
-# Asynchronous function to send POST request
-async def send_video(device_id, cam_name, file_name):
-    upload_video_api_url = f"{env_url}upload-video?device_id={device_id}&cam_name={cam_name}"
-
-    while True:
-        try:
-            async def fetch_presigned_url(session, url):
-                while True:
-                    async with session.get(url) as response:
-                        if response.status == 503:
-                            continue
-                        else:
-                            response_text = await response.text()
-                            return json.loads(response_text).get("s3_sign_url")
-
-            async def upload_file(session, url, file_path):
-                headers = {'Content-Type': 'video/mp4'}
-                with open(file_path, 'rb') as file_data:
-                    async with session.put(url, headers=headers, data=file_data) as response:
-                        if response.status == 200:
-                            print(f"{file_path} uploaded successfully")
-                            os.remove(file_path)
-                        else:
-                            print(f"Failed to upload file. HTTP Status Code: {response.status}")
-
-            async with aiohttp.ClientSession() as session:
-                presigned_url = await fetch_presigned_url(session, upload_video_api_url)
-                await upload_file(session, presigned_url, file_name)
-
-            break
-        except Exception as e:
-            print(f"Error uploading file: {e}")
-            await asyncio.sleep(1)  # Optional: delay before retrying
-
-
-# Function to record video
-def record_video(device_id, cam_key, stream, fps):
-    cap = None
-
-    while True:
-        if cap is None:
-            cap = cv2.VideoCapture(stream)
-            if not cap.isOpened():
-                print(f"Error opening stream: {stream}. Retrying...")
-                time.sleep(2)
-                continue  # Retry initialization
-
-        start_time = time.time()
-        current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_file = f"/home/rp/Aeye_iot/videos/recording_{current_time}.mp4"
-
-        out = cv2.VideoWriter(output_file, cv2.VideoWriter_fourcc(*'XVID'), fps, (
-            int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
-            int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        ))
-
-        print(f"Recording started: {output_file}")
-
-        while int(time.time() - start_time) < record_time:
-            ret, frame = cap.read()
-            if not ret:
-                print("Error: Failed to capture frame. Pausing recording.")
-                out.release()
-                cap.release()
-                cap = None
-                time.sleep(2)
-                break
-
-            out.write(frame)
-
-        out.release()
-
-        if ret:
-            print(f"Recording saved: {output_file}")
-            # Use threading for video upload to avoid blocking
-            thread = threading.Thread(target=run_async, args=(send_video, device_id, cam_key, output_file))
-            thread.daemon = True
-            thread.start()
-        time.sleep(2)  # Pause before restarting recording
-    
-
 # Function to process video streams
 def process_stream(stream_data, cam_key, cam_details):
     device_id = stream_data['device_id']
@@ -136,11 +49,6 @@ def process_stream(stream_data, cam_key, cam_details):
     retry_count = 0
     stream_image_data = []
 
-    asyncio.run(update_camera_status(device_id, cam_key, "Inactive"))
-    stream_data["camera_dict"]["camera_details"][cam_key]["status"] = "Inactive"
-    with open(json_path, 'w') as json_file:
-        json.dump(stream_data, json_file, indent=4)
-
     # Retry loop for opening the stream
     while True:
         cap = cv2.VideoCapture(stream)
@@ -149,19 +57,26 @@ def process_stream(stream_data, cam_key, cam_details):
         else:
             print(f"Error opening stream: {stream}. Retrying... ({retry_count + 1}/{max_retries})")
             retry_count += 1
+            stream_data["camera_dict"]["camera_details"][cam_key]["status"] = "Inactive"
+            with open(json_path, 'w') as json_file:
+                json.dump(stream_data, json_file, indent=4)
             time.sleep(1)
     
     fps = int(cap.get(cv2.CAP_PROP_FPS))
 
     # Start video recording in a separate thread
-    thread = threading.Thread(target=record_video, args=(device_id, cam_key, stream, fps))
+    cam_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, cam_key))
+    cam_path = device_id+"/"+cam_id
+    thread = threading.Thread(target=start_stream_capture, args=(cam_path, stream))
     thread.daemon = True
     thread.start()
 
     # Update stream status
     stream_data["camera_dict"]["camera_details"][cam_key]["status"] = "Active"
-    asyncio.run(update_camera_status(device_id, cam_key, "Active"))
-    with open(json_path, 'w') as json_file:
+    stream_data["camera_dict"]["camera_details"][cam_key]["cam_id"] = cam_id
+    stream_data["camera_dict"]["camera_details"][cam_key]["public_url"] = f"https://{BUCKET_NAME}.s3.amazonaws.com/{device_id}/{cam_id}/YEAR/MONTH/DATE/HOUR/HOUR.m3u8"
+    
+    with open(json_path, 'w') as json_file:     
         json.dump(stream_data, json_file, indent=4)
 
     prev_gray = None
@@ -170,7 +85,6 @@ def process_stream(stream_data, cam_key, cam_details):
         ret, frame = cap.read()
         if not ret:
             print(f"Error reading frame from stream: {stream}. Retrying...")
-            asyncio.run(update_camera_status(device_id, cam_key, "Inactive"))
             cap.release()
             retry_count = 0
             while True:
@@ -233,11 +147,11 @@ async def main():
     response_data = response.json()
 
     # store json in file
-    # with open(json_path, 'w') as f:
-    #     stream_data["camera_dict"] = {}
-    #     stream_data["camera_dict"]["camera_details"] = response_data['camera_dict'].get("camera_details")
-    #     stream_data["frame_change_count"] = response_data["camera_dict"].get('frame_change_count',7000)	
-    #     json.dump(stream_data, f)
+    with open(json_path, 'w') as f:
+        stream_data["camera_dict"] = {}
+        stream_data["camera_dict"]["camera_details"] = response_data['camera_dict'].get("camera_details")
+        stream_data["frame_change_count"] = response_data["camera_dict"].get('frame_change_count',7000)	
+        json.dump(stream_data, f)
 
     print(stream_data)
     
