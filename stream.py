@@ -12,8 +12,20 @@ from logging.handlers import RotatingFileHandler
 
 load_dotenv()
 
+
+s3 = boto3.client('s3')
+
+LOG_PATH = os.getenv('LOG_PATH', 'logs/')
+BUCKET_NAME = os.getenv('BUCKET_NAME', 'aeye-stream')
+
+# Local output path
+LOCAL_OUTPUT_PATH = os.getenv('LOCAL_OUTPUT_PATH', '/home/rp/AeyeIoT/stream_output/')
+
+# Ensure the output directory exists
+os.makedirs(LOCAL_OUTPUT_PATH, exist_ok=True)
+
 # Modify the log format to exclude leading zeros in year, month, day, hour, minutes, and seconds
-log_handler = RotatingFileHandler('logs/AeyeIoT.log', maxBytes=1000000, backupCount=5)
+log_handler = RotatingFileHandler(LOG_PATH+'AeyeIoT.log', maxBytes=1000000, backupCount=5)
 logging.basicConfig(
     handlers=[log_handler],
     level=logging.INFO,
@@ -29,14 +41,6 @@ def log_event(level, message):
     }
     logging.log(level, json.dumps(log_entry))
 
-s3 = boto3.client('s3')
-BUCKET_NAME = os.getenv('BUCKET_NAME', 'aeye-stream')
-
-# Local output path
-LOCAL_OUTPUT_PATH = os.getenv('LOCAL_OUTPUT_PATH', '/home/rp/AeyeIoT/stream_output/')
-
-# Ensure the output directory exists
-os.makedirs(LOCAL_OUTPUT_PATH, exist_ok=True)
 
 def get_latest_file_in_s3_folder(bucket_name, s3_folder):
     """Get the latest file in the specified S3 folder."""

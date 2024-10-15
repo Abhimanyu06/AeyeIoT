@@ -16,7 +16,12 @@ from logging.handlers import RotatingFileHandler
 
 load_dotenv()
 
-log_handler = RotatingFileHandler('logs/AeyeIoT.log', maxBytes=1000000, backupCount=5)
+LOG_PATH = os.getenv('LOG_PATH', "logs/")
+env_url = os.getenv('env_url', "https://6to69015t0.execute-api.us-east-1.amazonaws.com/test/")
+json_path = os.getenv('json_path', "/home/rp/AeyeIoT/camera.json")
+BUCKET_NAME = os.getenv('BUCKET_NAME', 'aeye-stream')
+
+log_handler = RotatingFileHandler(LOG_PATH+'AeyeIoT.log', maxBytes=1000000, backupCount=5)
 logging.basicConfig(
     handlers=[log_handler],
     level=logging.INFO,
@@ -31,10 +36,6 @@ def log_event(level, message):
     }
     logging.log(level, json.dumps(log_entry))
 
-
-env_url = os.getenv('env_url', "https://6to69015t0.execute-api.us-east-1.amazonaws.com/test/")
-json_path = os.getenv('json_path', "/home/rp/AeyeIoT/camera.json")
-BUCKET_NAME = os.getenv('BUCKET_NAME', 'aeye-stream')
 
 # Define the codec and create VideoWriter object
 fourcc = cv2.VideoWriter_fourcc(*'XVID')
