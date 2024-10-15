@@ -13,7 +13,7 @@ s3 = boto3.client('s3')
 BUCKET_NAME = os.getenv('BUCKET_NAME', 'aeye-stream')
 
 # Local output path
-LOCAL_OUTPUT_PATH = os.getenv('LOCAL_OUTPUT_PATH', '/home/rp/Aeye_iot/stream_output/')
+LOCAL_OUTPUT_PATH = os.getenv('LOCAL_OUTPUT_PATH', '/home/rp/AeyeIoT/stream_output/')
 
 # Ensure the output directory exists
 os.makedirs(LOCAL_OUTPUT_PATH, exist_ok=True)

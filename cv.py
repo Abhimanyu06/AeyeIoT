@@ -15,7 +15,7 @@ from stream import start_stream_capture
 load_dotenv()
 
 env_url = os.getenv('env_url', "https://6to69015t0.execute-api.us-east-1.amazonaws.com/test/")
-json_path = os.getenv('json_path', "/home/rp/Aeye_iot/camera.json")
+json_path = os.getenv('json_path', "/home/rp/AeyeIoT/camera.json")
 BUCKET_NAME = os.getenv('BUCKET_NAME', 'aeye-stream')
 
 # Define the codec and create VideoWriter object
