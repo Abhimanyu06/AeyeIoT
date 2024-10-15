@@ -44,7 +44,7 @@ def RequestHandlerClassFactory(address, ssids, rcode):
             # We must set our custom class properties first, since __init__() of
             # our super class will call do_GET().
             self.address = address
-            self.ssids = netman.get_list_of_access_points()
+            self.ssids = ssids
             self.rcode = rcode
             super(MyHTTPReqHandler, self).__init__(*args, **kwargs)
 
@@ -56,19 +56,19 @@ def RequestHandlerClassFactory(address, ssids, rcode):
             # Handle the hotspot starting and a computer connecting to it,
             # we have to return a redirect to the gateway to get the 
             # captured portal to show up.
-            if '/hotspot-detect.html' == self.path:
-                # self.send_response(301) # redirect
-                new_path = f'http://{self.address}/'
-                print(f'redirecting to {new_path}')
-                self.send_header('Location', new_path)
-                self.end_headers()
+            #if '/hotspot-detect.html' == self.path:
+            #    self.send_response(301) # redirect
+            #    new_path = f'http://{self.address}/'
+            #    print(f'redirecting to {new_path}')
+            #    self.send_header('Location', new_path)
+            #    self.end_headers()
 
-            if '/generate_204' == self.path:
-                # self.send_response(301) # redirect
-                new_path = f'http://{self.address}/'
-                print(f'redirecting to {new_path}')
-                self.send_header('Location', new_path)
-                self.end_headers()
+            #if '/generate_204' == self.path:
+            #    self.send_response(301) # redirect
+            #    new_path = f'http://{self.address}/'
+            #    print(f'redirecting to {new_path}')
+            #    self.send_header('Location', new_path)
+            #    self.end_headers()
 
             # Handle a REST API request to return the device registration code
             if '/regcode' == self.path:
@@ -85,7 +85,7 @@ def RequestHandlerClassFactory(address, ssids, rcode):
                 self.send_response(200)
                 self.end_headers()
                 response = BytesIO()
-                ssids = netman.get_list_of_access_points() # passed in to the class factory
+                ssids = self.ssids # passed in to the class factory
                 """ map whatever we get from net man to our constants:
                 Security:
                     NONE         
@@ -129,6 +129,7 @@ def RequestHandlerClassFactory(address, ssids, rcode):
             FORM_HIDDEN_SSID = 'hidden-ssid'
             FORM_USERNAME = 'identity'
             FORM_PASSWORD = 'passphrase'
+            FORM_DEVICEID = 'deviceid'
 
             if FORM_SSID not in fields:
                 print(f'Error: POST is missing {FORM_SSID} field.')
@@ -143,6 +144,11 @@ def RequestHandlerClassFactory(address, ssids, rcode):
                 username = fields[FORM_USERNAME][0] 
             if FORM_PASSWORD in fields: 
                 password = fields[FORM_PASSWORD][0] 
+            if FORM_DEVICEID in fields:
+                deviceid = fields[FORM_DEVICEID][0]
+                #store device id in json  file
+                with open('/home/rp/Aeye_iot/camera.json', 'w') as f:
+                    json.dump({'device_id': deviceid}, f)
 
             # Look up the ssid in the list we sent, to find out its security
             # type for the new connection we have to make
