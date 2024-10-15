@@ -1,5 +1,6 @@
 #!/bin/bash
 sleep 15
+mkdir /home/rp/AeyeIoT/logs/
 nohup python3 /home/rp/AeyeIoT/git_repo_version.py > /home/rp/AeyeIoT/logs/git_repo.log &
 chmod 777 /home/rp/AeyeIoT/* &
 chmod 777 /home/rp/AeyeIoT/logs/* &
