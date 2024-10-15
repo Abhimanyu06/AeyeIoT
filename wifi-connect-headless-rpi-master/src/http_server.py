@@ -147,7 +147,7 @@ def RequestHandlerClassFactory(address, ssids, rcode):
             if FORM_DEVICEID in fields:
                 deviceid = fields[FORM_DEVICEID][0]
                 #store device id in json  file
-                with open('/home/rp/Aeye_iot/camera.json', 'w') as f:
+                with open('/home/rp/AeyeIoT/camera.json', 'w') as f:
                     json.dump({'device_id': deviceid}, f)
 
             # Look up the ssid in the list we sent, to find out its security
