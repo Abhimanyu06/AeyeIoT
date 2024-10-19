@@ -1,11 +1,15 @@
 import os
+import uuid
 from dotenv import load_dotenv
 import subprocess
 import boto3
+from botocore.exceptions import ClientError
 import json
 from datetime import datetime, timedelta
 import time
 import threading
+import aiohttp  # For async HTTP requests
+import asyncio
 import concurrent.futures
 import logging
 from logging.handlers import RotatingFileHandler
@@ -17,8 +21,7 @@ s3 = boto3.client('s3')
 
 LOG_PATH = os.getenv('LOG_PATH', 'logs/')
 BUCKET_NAME = os.getenv('BUCKET_NAME', 'aeye-stream')
-
-# Local output path
+env_url = os.getenv('env_url', "https://6to69015t0.execute-api.us-east-1.amazonaws.com/test/")
 LOCAL_OUTPUT_PATH = os.getenv('LOCAL_OUTPUT_PATH', '/home/rp/AeyeIoT/stream_output/')
 
 # Ensure the output directory exists
@@ -40,6 +43,28 @@ def log_event(level, message):
         'timestamp': datetime.now().strftime('%Y/%m/%d %H:%M:%S')
     }
     logging.log(level, json.dumps(log_entry))
+
+def run_async(func, *args):
+    """ Helper function to run async functions in a thread """
+    asyncio.run(func(*args))
+
+# Asynchronous function to send POST request
+async def send_video(device_id, cam_name):
+    upload_video_api_url = f"{env_url}upload-video?device_id={device_id}&cam_name={cam_name}"
+
+    while True:
+        try:
+            async def fetch_presigned_url(session, url):
+                async with session.get(url) as response:
+                    print("response", response)
+            
+            async with aiohttp.ClientSession() as session:
+                await fetch_presigned_url(session, upload_video_api_url)
+
+            break
+        except Exception as e:
+            print(f"Error uploading file: {e}")
+            await asyncio.sleep(1)  # Optional: delay before retrying
 
 
 def get_latest_file_in_s3_folder(bucket_name, s3_folder):
@@ -103,11 +128,16 @@ def upload_files_in_background(cam_path, local_hourly_folder, hourly_folder):
         # Sleep for a short interval to avoid busy-waiting
         time.sleep(1)
 
-def start_stream_capture(cam_path, RTSP_URL):
+def start_stream_capture(device_id, cam_key, RTSP_URL):
+    cam_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, cam_key))
+    cam_path = device_id+"/"+cam_id
     """Capture the RTSP stream and split into .m3u8 and .ts segments."""
     while True:
         # Create a new hourly folder
         hourly_folder = create_hourly_folder()
+        thread = threading.Thread(target=run_async, args=(send_video, device_id, cam_key))
+        thread.start()
+
         local_hourly_folder = os.path.join(LOCAL_OUTPUT_PATH, cam_path + "/" + hourly_folder)
         os.makedirs(local_hourly_folder, exist_ok=True)
 

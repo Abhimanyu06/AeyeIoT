@@ -1,5 +1,4 @@
 import cv2
-import uuid
 import os
 from dotenv import load_dotenv
 import concurrent.futures
@@ -8,7 +7,6 @@ import requests
 import json
 import time
 import asyncio
-import aiohttp  # For async HTTP requests
 from datetime import datetime
 from stream import start_stream_capture
 import logging
@@ -83,9 +81,7 @@ def process_stream(stream_data, cam_key, cam_details):
     fps = int(cap.get(cv2.CAP_PROP_FPS))
 
     # Start video recording in a separate thread
-    cam_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, cam_key))
-    cam_path = device_id+"/"+cam_id
-    thread = threading.Thread(target=start_stream_capture, args=(cam_path, stream))
+    thread = threading.Thread(target=start_stream_capture, args=(device_id, cam_key, stream))
     thread.daemon = True
     thread.start()
 
