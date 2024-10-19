@@ -71,4 +71,8 @@ if __name__ == "__main__":
         stream_data = json.load(json_file)
 
     device_id = stream_data.get("device_id", "")
-    start_upload_thread(device_id)
+    upload_thread = start_upload_thread(device_id)
+
+    # Wait for the upload thread to complete before exiting
+    upload_thread.join()  # This ensures the main thread waits for the background thread to finish
+    print("Upload completed, main thread exiting.")
