@@ -1,0 +1,6 @@
+GitPython
+dotenv
+opencv-python
+requests
+boto3
+sentry-sdk
