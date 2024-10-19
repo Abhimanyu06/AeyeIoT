@@ -12,7 +12,7 @@ import aiohttp  # For async HTTP requests
 import asyncio
 import concurrent.futures
 import logging
-from logging.handlers import RotatingFileHandler
+from logging.handlers import TimedRotatingFileHandler
 
 load_dotenv()
 
@@ -28,7 +28,7 @@ LOCAL_OUTPUT_PATH = os.getenv('LOCAL_OUTPUT_PATH', '/home/rp/AeyeIoT/stream_outp
 os.makedirs(LOCAL_OUTPUT_PATH, exist_ok=True)
 
 # Modify the log format to exclude leading zeros in year, month, day, hour, minutes, and seconds
-log_handler = RotatingFileHandler(LOG_PATH+'AeyeIoT.log', maxBytes=1000000, backupCount=5)
+log_handler = TimedRotatingFileHandler(LOG_PATH+'AeyeIoT.log', when='H', interval=1, backupCount=5)
 logging.basicConfig(
     handlers=[log_handler],
     level=logging.INFO,

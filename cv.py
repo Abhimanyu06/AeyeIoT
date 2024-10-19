@@ -10,7 +10,7 @@ import asyncio
 from datetime import datetime
 from stream import start_stream_capture
 import logging
-from logging.handlers import RotatingFileHandler
+from logging.handlers import TimedRotatingFileHandler
 
 load_dotenv()
 
@@ -19,7 +19,7 @@ env_url = os.getenv('env_url', "https://6to69015t0.execute-api.us-east-1.amazona
 json_path = os.getenv('json_path', "/home/rp/AeyeIoT/camera.json")
 BUCKET_NAME = os.getenv('BUCKET_NAME', 'aeye-stream')
 
-log_handler = RotatingFileHandler(LOG_PATH+'AeyeIoT.log', maxBytes=1000000, backupCount=5)
+log_handler = TimedRotatingFileHandler(LOG_PATH+'AeyeIoT.log', when='H', interval=1, backupCount=5)
 logging.basicConfig(
     handlers=[log_handler],
     level=logging.INFO,

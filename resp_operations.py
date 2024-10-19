@@ -7,12 +7,12 @@ from delete_wifi import *
 from datetime import datetime
 import json
 import logging
-from logging.handlers import RotatingFileHandler
+from logging.handlers import TimedRotatingFileHandler
 
 load_dotenv()
 LOG_PATH = os.getenv('LOG_PATH', "logs/")
 
-log_handler = RotatingFileHandler(LOG_PATH+'AeyeIoT.log', maxBytes=1000000, backupCount=5)
+log_handler = TimedRotatingFileHandler(LOG_PATH+'AeyeIoT.log', when='H', interval=1, backupCount=5)
 logging.basicConfig(
     handlers=[log_handler],
     level=logging.INFO,
