@@ -2,15 +2,19 @@
     "device_id": "0304e846-8fa3-5f6d-9606-ef12e35420fa",
     "camera_dict": {
         "camera_details": {
-            "cam1": {
-                "url": "rtsp://admin:admin@192.168.29.88:1935",
-                "status": "Inactive"
+            "CAM2": {
+                "public_url": "https://aeye-stream.s3.amazonaws.com/0304e846-8fa3-5f6d-9606-ef12e35420fa/4c43f4a6-e748-5ddf-8233-2bb5da5067cb/",
+                "cam_id": "4c43f4a6-e748-5ddf-8233-2bb5da5067cb",
+                "url": "rtsp://admin:admin@192.168.29.89:1935",
+                "status": "Active"
             },
-            "Cam2": {
+            "CAM1": {
+                "public_url": "https://aeye-stream.s3.amazonaws.com/0304e846-8fa3-5f6d-9606-ef12e35420fa/fdabbed6-595d-5cf5-810a-826b66bafdaa/",
+                "cam_id": "fdabbed6-595d-5cf5-810a-826b66bafdaa",
                 "url": "rtsp://admin:admin@192.168.29.12:1935",
                 "status": "Active"
             }
         }
     },
-    "frame_change_count": 10000
+    "frame_change_count": 7000
 }
